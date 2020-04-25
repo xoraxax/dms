@@ -13,7 +13,7 @@ To install:
   5. `virtualenv -p python3 env`
   6. `. env/bin/activate`
   7. `pip install flask`
-  8. `sudo apt install pdfsandwich poppler-utils imagemagick`
+  8. `sudo apt install pdfsandwich poppler-utils imagemagick ghostscript netpbm`
 
 To run:
 
