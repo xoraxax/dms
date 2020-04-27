@@ -71,8 +71,11 @@ def heading(s):
 
 def search_box(q):
     return (
-        '<form><input type="text" value="%s" name="q" placeholder="Search query" autofocus><input type="submit" value="Search"></form>'
-        % cgi.escape(q, quote=True)
+        """
+        <form id="search">
+          <input class=input type="text" value="%s" name="q" placeholder="Search query" autofocus>
+          <input class=button type="submit" value="Search">
+        </form>""" % cgi.escape(q, quote=True)
     )
 
 
@@ -115,6 +118,22 @@ img.small {
 img.redflag {
     background-color: orange;
 }
+
+#search {
+    width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    display: grid;
+    grid-template-columns: auto 200px;
+    grid-template-rows: 25px;
+    grid-template-areas: "input button";
+}
+#search > .input {
+    grid-area: input;
+}
+#search > .button {
+    grid-area: button;
+}
 """
     return (
         "<html><head><title>DMS</title><style>%s</style></head><body>%s</body></html>"
@@ -150,7 +169,11 @@ def edit(name):
         return render_page(
             [
                 heading("DMS - %s (%i pages)" % (origname, page_count(origname))),
-                '<form method=POST><textarea name="value" rows="10" cols="80" placeholder="Title and description here">%s</textarea><input type="submit" value="Save"></form>%s<img src="%s">'
+                """
+                <form method=POST>
+                  <textarea name="value" rows="10" cols="80" placeholder="Title and description here">%s</textarea>
+                  <input type="submit" value="Save">
+                </form>%s<img src="%s">"""
                 % (
                     cgi.escape(data, quote=True),
                     link_list(
