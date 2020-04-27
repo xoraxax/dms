@@ -71,7 +71,7 @@ def heading(s):
 
 def search_box(q):
     return (
-        '<form><input type="text" value="%s" name="q" placeholder="Search query"><input type="submit" value="Search"></form>'
+        '<form><input type="text" value="%s" name="q" placeholder="Search query" autofocus><input type="submit" value="Search"></form>'
         % cgi.escape(q, quote=True)
     )
 
