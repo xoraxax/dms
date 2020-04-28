@@ -90,18 +90,18 @@ def listofdir(func, filter_to):
     return "".join(rv)
 
 
-def link_list(es):
-    rv = ["<ul style='display: block; padding: 1em; '>"]
-    for e in es:
-        rv.append("<li>")
-        rv.append(e)
-        rv.append("</li>")
-    rv.append("</ul>")
-    return "".join(rv)
+def link_list(items, attributes = 'class="list_items"' ):
+    ulist = [ ("<ul %s>" % attributes) ]
+    for item in items:
+        ulist.append("<li>")
+        ulist.append(item)
+        ulist.append("</li>")
+    ulist.append("</ul>")
+    return "".join(ulist)
 
 
 def flink(title, method, arg):
-    return "<a target='_blank' href='%s'>%s</a>" % (url_for(method, name=arg), title)
+    return "<a class=button target='_blank' href='%s'>%s</a>" % (url_for(method, name=arg), title)
 
 
 def render_page(l):
@@ -125,14 +125,82 @@ img.redflag {
     margin-right: auto;
     display: grid;
     grid-template-columns: auto 200px;
-    grid-template-rows: 25px;
+    grid-template-rows: auto;
     grid-template-areas: "input button";
 }
 #search > .input {
     grid-area: input;
+    margin-right: 5px;
+    padding-left: 11px;
 }
 #search > .button {
     grid-area: button;
+}
+
+#edit {
+    width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+    display: grid;
+    grid-template-columns: 220px 580px;
+    grid-template-rows: auto;
+    grid-template-areas:
+    "description description"
+    "downloads preview";
+}
+#edit > .description {
+    grid-area: description;
+}
+#edit > .list_items{
+    grid-area: downloads;
+    margin-left:auto;
+    padding: 0px;
+}
+#edit > .preview{
+    grid-area: preview;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+.description {
+    display: grid;
+    grid-template-columns: auto 200px;
+    grid-template-rows: auto;
+    grid-template-areas:
+    "input input"
+    ". button";
+}
+.description > .input {
+    grid-area: input;
+    height: 100px;
+    padding-left: 10px;
+    padding-top: 8px;
+    padding-right: 6px;
+}
+.description > .button{
+    grid-area: button;
+    margin-top: 5px;
+}
+
+.button {
+    background-color: #4CAF50; /* Green */
+    color: white;
+    transition-duration: 0.4s;
+    border: none;
+    padding: 12px 28px;
+    text-decoration: none;
+}
+.button:hover {
+    background-color: #dcefdc;
+    color: #4CAF50;
+}
+
+.list_items {
+    list-style: none;
+}
+.list_items li {
+    margin-bottom: 30px;
+    text-align: right;
 }
 """
     return (
@@ -170,16 +238,17 @@ def edit(name):
             [
                 heading("DMS - %s (%i pages)" % (origname, page_count(origname))),
                 """
-                <form method=POST>
-                  <textarea name="value" rows="10" cols="80" placeholder="Title and description here">%s</textarea>
-                  <input type="submit" value="Save">
-                </form>%s<img src="%s">"""
+                <div id=edit>
+                <form class=description method=POST>
+                  <textarea class=input name="value" placeholder="Title and description">%s</textarea>
+                  <input class=button type="submit" value="Save">
+                </form>%s<img class=preview src="%s"></div>"""
                 % (
                     cgi.escape(data, quote=True),
                     link_list(
                         [
-                            flink("view OCRed", "download", origname + ".pdf"),
-                            flink("view original", "download", origname + ".orig.pdf"),
+                            flink("View Orginal version", "download", origname + ".orig.pdf"),
+                            flink("View OCR version", "download", origname + ".pdf"),
                         ]
                     ),
                     url_for("download", name=origname + ".png"),
