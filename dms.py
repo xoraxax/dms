@@ -247,7 +247,7 @@ def edit(name):
                     cgi.escape(data, quote=True),
                     link_list(
                         [
-                            flink("View Orginal version", "download", origname + ".orig.pdf"),
+                            flink("View Original version", "download", origname + ".orig.pdf"),
                             flink("View OCR version", "download", origname + ".pdf"),
                         ]
                     ),
