@@ -13,7 +13,6 @@ import time
 from flask import Flask, redirect, url_for, send_from_directory, request
 from werkzeug.utils import secure_filename
 
-
 logging.basicConfig()
 app = Flask(__name__)
 DATA_DIR = os.path.abspath(os.environ["DMSDATA"])
@@ -24,23 +23,26 @@ FILE_QUEUE = queue.Queue()
 
 
 class DirReaderThread(threading.Thread):
+    """looks for files that have a ctime which is older than DELAY
+    and runs import.sh on them"""
+
     def run(self):
         files = {}
         while True:
             time.sleep(1)
-            for fname in glob.glob(os.path.join(SOURCE_DIR, "*.pdf")):
-                t = time.time()
-                if files.setdefault(fname, t + DELAY) < t:
-                    del files[fname]
-                    FILE_QUEUE.put(fname)
+            for filename in glob.glob(os.path.join(SOURCE_DIR, "*.pdf")):
+                current_time = time.time()
+                if files.setdefault(filename, current_time + DELAY) < current_time:
+                    del files[filename]
+                    FILE_QUEUE.put(filename)
 
 
 class ImporterThread(threading.Thread):
     def run(self):
         while True:
-            fname = FILE_QUEUE.get()
+            filename = FILE_QUEUE.get()
             # XXX use subprocess
-            os.system('"%s" "%s" "%s"' % (IMPORTER, fname, DATA_DIR))
+            os.system('"%s" "%s" "%s"' % (IMPORTER, filename, DATA_DIR))
 
 
 @app.before_first_request
@@ -49,20 +51,20 @@ def boot_thread():
     DirReaderThread().start()
 
 
-def search(q):
-    if not q:
+def search(query):
+    if not query:
         yield from (
             os.path.basename(x).rsplit(".", 1)[0]
             for x in glob.glob(os.path.join(DATA_DIR, "*.txt"))
         )
     else:
-        res = [re.compile(segment, re.I | re.U) for segment in q.split()]
-        for fname in glob.glob(os.path.join(DATA_DIR, "*.txt")) + glob.glob(
-            os.path.join(DATA_DIR, "*.desc")
+        res = [re.compile(segment, re.I | re.U) for segment in query.split()]
+        for filename in glob.glob(os.path.join(DATA_DIR, "*.txt")) + glob.glob(
+                os.path.join(DATA_DIR, "*.desc")
         ):
-            data = open(fname).read()
+            data = open(filename).read()
             if all(regex.search(data) for regex in res):
-                yield os.path.basename(fname).rsplit(".", 1)[0]
+                yield os.path.basename(filename).rsplit(".", 1)[0]
 
 
 def heading(s):
@@ -71,40 +73,40 @@ def heading(s):
 
 def search_box(q):
     return (
-        """
-        <form id="search">
-          <input class=input type="text" value="%s" name="q" placeholder="Search query" autofocus>
-          <input class=button type="submit" value="Search">
-        </form>""" % cgi.escape(q, quote=True)
+            """
+            <form id="search">
+              <input class=input type="text" value="%s" name="q" placeholder="Search query" autofocus>
+              <input class=button type="submit" value="Search">
+            </form>""" % cgi.html.escape(q, quote=True)
     )
 
 
-def listofdir(func, filter_to):
+def list_of_directories(func, filter_to):
     filter_to = sorted(filter_to, reverse=True)
-    rv = ["<ul>"]
-    for fname in filter_to:
-        rv.append("<li style='display: inline-block; padding: 1em;'>")
-        rv.append(func(fname))
-        rv.append("</li>")
-    rv.append("</ul>")
-    return "".join(rv)
+    result = ["<ul>"]
+    for filename in filter_to:
+        result.append("<li style='display: inline-block; padding: 1em;'>")
+        result.append(func(filename))
+        result.append("</li>")
+    result.append("</ul>")
+    return "".join(result)
 
 
-def link_list(items, attributes = 'class="list_items"' ):
-    ulist = [ ("<ul %s>" % attributes) ]
+def link_list(items, attributes='class="list_items"'):
+    result = [("<ul %s>" % attributes)]
     for item in items:
-        ulist.append("<li>")
-        ulist.append(item)
-        ulist.append("</li>")
-    ulist.append("</ul>")
-    return "".join(ulist)
+        result.append("<li>")
+        result.append(item)
+        result.append("</li>")
+    result.append("</ul>")
+    return "".join(result)
 
 
-def flink(title, method, arg):
+def link_item(title, method, arg):
     return "<a class=button target='_blank' href='%s'>%s</a>" % (url_for(method, name=arg), title)
 
 
-def render_page(l):
+def render_page(body):
     s = """
 img {
     padding: 1em;
@@ -115,7 +117,7 @@ img.small {
     height: 200px;
 }
 
-img.redflag {
+img.red_flag {
     background-color: orange;
 }
 
@@ -204,20 +206,28 @@ img.redflag {
 }
 """
     return (
-        "<html><head><title>DMS</title><style>%s</style></head><body>%s</body></html>"
-        % (s, "\n".join(l))
+            """
+            <html>
+            <head>
+            <title>DMS</title>
+            <style>%s</style>
+            </head>
+            <body>%s</body>
+            </html>
+            """
+            % (s, "\n".join(body))
     )
 
 
-def compute_img_class(fname):
-    path = os.path.join(DATA_DIR, fname)
+def compute_img_class(filename):
+    path = os.path.join(DATA_DIR, filename)
     if os.path.exists(path + ".desc"):
         return ""
-    return "redflag"
+    return "red_flag"
 
 
-def page_count(fname):
-    path = os.path.join(DATA_DIR, fname) + ".count"
+def page_count(filename):
+    path = os.path.join(DATA_DIR, filename) + ".count"
     if os.path.exists(path):
         return int(open(path).read())
     return 0
@@ -225,18 +235,18 @@ def page_count(fname):
 
 @app.route("/edit/<name>", methods="GET POST".split())
 def edit(name):
-    origname = name
+    original_name = name
     basename = os.path.join(DATA_DIR, secure_filename(name))
-    descname = basename + ".desc"
+    description_file = basename + ".desc"
     try:
-        data = open(descname).read()
+        data = open(description_file).read()
     except OSError:
         data = ""
-    q = request.form.get("value", None)
-    if q is None:
+    query = request.form.get("value", None)
+    if query is None:
         return render_page(
             [
-                heading("DMS - %s (%i pages)" % (origname, page_count(origname))),
+                heading("DMS - %s (%i pages)" % (original_name, page_count(original_name))),
                 """
                 <div id=edit>
                 <form class=description method=POST>
@@ -244,19 +254,19 @@ def edit(name):
                   <input class=button type="submit" value="Save">
                 </form>%s<img class=preview src="%s"></div>"""
                 % (
-                    cgi.escape(data, quote=True),
+                    cgi.html.escape(data, quote=True),
                     link_list(
                         [
-                            flink("View Original version", "download", origname + ".orig.pdf"),
-                            flink("View OCR version", "download", origname + ".pdf"),
+                            link_item("View Original version", "download", original_name + ".orig.pdf"),
+                            link_item("View OCR version", "download", original_name + ".pdf"),
                         ]
                     ),
-                    url_for("download", name=origname + ".png"),
+                    url_for("download", name=original_name + ".png"),
                 ),
             ]
         )
     else:
-        open(descname, "w").write(q)
+        open(description_file, "w").write(query)
         return redirect(url_for("root"))
 
 
@@ -267,20 +277,20 @@ def download(name):
 
 @app.route("/")
 def root():
-    q = request.args.get("q", "")
-    filter_to = set(search(q))
+    query = request.args.get("q", "")
+    filter_to = set(search(query))
     return render_page(
         [
-            heading(("DMS - '%s'" % (q,)) if q else "DMS"),
-            search_box(q),
-            listofdir(
-                lambda fname: '<a href="%s"><img title="%i pages" class="small %s" src="%s"></a>'
-                % (
-                    url_for("edit", name=fname),
-                    page_count(fname),
-                    compute_img_class(fname),
-                    url_for("download", name=fname + ".png"),
-                ),
+            heading(("DMS - '%s'" % (query,)) if query else "DMS"),
+            search_box(query),
+            list_of_directories(
+                lambda filename: '<a href="%s"><img title="%i pages" class="small %s" src="%s"></a>'
+                                 % (
+                                     url_for("edit", name=filename),
+                                     page_count(filename),
+                                     compute_img_class(filename),
+                                     url_for("download", name=filename + ".png"),
+                                 ),
                 filter_to=filter_to,
             ),
         ]
