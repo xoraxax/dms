@@ -1,8 +1,8 @@
 # (c) 2019 Alexander Schremmer <alex@alexanderweb.de>
 # Licensed under AGPL v3.
 
-import cgi
 import glob
+import html
 import logging
 import os
 import queue
@@ -66,13 +66,13 @@ def search(q):
 
 
 def heading(s):
-    return "<h1><a href='/'>" + cgi.escape(s, quote=True) + "</a></h1>"
+    return "<h1><a href='/'>" + html.escape(s, quote=True) + "</a></h1>"
 
 
 def search_box(q):
     return (
         '<form><input type="text" value="%s" name="q" placeholder="Search query"><input type="submit" value="Search"></form>'
-        % cgi.escape(q, quote=True)
+        % html.escape(q, quote=True)
     )
 
 
@@ -152,7 +152,7 @@ def edit(name):
                 heading("DMS - %s (%i pages)" % (origname, page_count(origname))),
                 '<form method=POST><textarea name="value" rows="10" cols="80" placeholder="Title and description here">%s</textarea><input type="submit" value="Save"></form>%s<img src="%s">'
                 % (
-                    cgi.escape(data, quote=True),
+                    html.escape(data, quote=True),
                     link_list(
                         [
                             flink("view OCRed", "download", origname + ".pdf"),
