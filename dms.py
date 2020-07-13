@@ -17,10 +17,12 @@ from werkzeug.utils import secure_filename
 logging.basicConfig()
 app = Flask(__name__)
 DATA_DIR = os.path.abspath(os.environ["DMSDATA"])
+SUB_DATA_DIRS = sorted(os.path.basename(path) for path in (os.path.join(DATA_DIR, path) for path in os.listdir(DATA_DIR)) if os.path.isdir(path) and not os.path.islink(path))
 SOURCE_DIR = os.readlink(os.path.join(DATA_DIR, "SOURCE_DIR"))
 IMPORTER = os.path.abspath(os.path.join(__file__, "..", "importer.sh"))
 DELAY = 45
 FILE_QUEUE = queue.Queue()
+RE_TAG = re.compile(r"#[^\s]*", re.U)
 
 
 class DirReaderThread(threading.Thread):
@@ -40,11 +42,12 @@ class ImporterThread(threading.Thread):
         while True:
             fname = FILE_QUEUE.get()
             # XXX use subprocess
-            os.system('"%s" "%s" "%s"' % (IMPORTER, fname, DATA_DIR))
+            os.system('"%s" "%s" "%s"' % (IMPORTER, fname, app.data_dir))
 
 
 @app.before_first_request
 def boot_thread():
+    app.data_dir = os.path.join(DATA_DIR, SUB_DATA_DIRS[0]) if SUB_DATA_DIRS else DATA_DIR
     ImporterThread().start()
     DirReaderThread().start()
 
@@ -53,12 +56,12 @@ def search(q):
     if not q:
         yield from (
             os.path.basename(x).rsplit(".", 1)[0]
-            for x in glob.glob(os.path.join(DATA_DIR, "*.txt"))
+            for x in glob.glob(os.path.join(app.data_dir, "*.txt"))
         )
     else:
         res = [re.compile(segment, re.I | re.U) for segment in q.split()]
-        for fname in glob.glob(os.path.join(DATA_DIR, "*.txt")) + glob.glob(
-            os.path.join(DATA_DIR, "*.desc")
+        for fname in glob.glob(os.path.join(app.data_dir, "*.txt")) + glob.glob(
+            os.path.join(app.data_dir, "*.desc")
         ):
             data = open(fname).read()
             if all(regex.search(data) for regex in res):
@@ -67,6 +70,12 @@ def search(q):
 
 def heading(s):
     return "<h1><a href='/'>" + html.escape(s, quote=True) + "</a></h1>"
+
+
+def change_tenant():
+    return "<form action='/'><label>Tenant: <select onchange='this.form.submit();' name='tenant' size='1'>%s</select></label></form>" % (
+            "\n".join("<option%s>%s</option>" % (" selected" if path == os.path.basename(app.data_dir) else "", path) for path in SUB_DATA_DIRS),
+    )
 
 
 def search_box(q):
@@ -100,6 +109,9 @@ def link_list(es):
 def flink(title, method, arg):
     return "<a target='_blank' href='%s'>%s</a>" % (url_for(method, name=arg), title)
 
+def search_link(query):
+    return "<a href='%s'>%s</a>" % (url_for("root", q=query), html.escape(query))
+
 
 def render_page(l):
     s = """
@@ -115,6 +127,10 @@ img.small {
 img.redflag {
     background-color: orange;
 }
+
+a:link {
+    text-decoration: none;
+}
 """
     return (
         "<html><head><title>DMS</title><style>%s</style></head><body>%s</body></html>"
@@ -123,14 +139,14 @@ img.redflag {
 
 
 def compute_img_class(fname):
-    path = os.path.join(DATA_DIR, fname)
+    path = os.path.join(app.data_dir, fname)
     if os.path.exists(path + ".desc"):
         return ""
     return "redflag"
 
 
 def page_count(fname):
-    path = os.path.join(DATA_DIR, fname) + ".count"
+    path = os.path.join(app.data_dir, fname) + ".count"
     if os.path.exists(path):
         return int(open(path).read())
     return 0
@@ -139,7 +155,7 @@ def page_count(fname):
 @app.route("/edit/<name>", methods="GET POST".split())
 def edit(name):
     origname = name
-    basename = os.path.join(DATA_DIR, secure_filename(name))
+    basename = os.path.join(app.data_dir, secure_filename(name))
     descname = basename + ".desc"
     try:
         data = open(descname).read()
@@ -147,9 +163,10 @@ def edit(name):
         data = ""
     q = request.form.get("value", None)
     if q is None:
+        tags = RE_TAG.findall(data)
         return render_page(
             [
-                heading("DMS - %s (%i pages)" % (origname, page_count(origname))),
+                heading("DMS%s: %s (%i pages)" % (tenant_suffix(), origname, page_count(origname))),
                 '<form method=POST><textarea name="value" rows="10" cols="80" placeholder="Title and description here">%s</textarea><input type="submit" value="Save"></form>%s<img src="%s">'
                 % (
                     html.escape(data, quote=True),
@@ -161,6 +178,7 @@ def edit(name):
                     ),
                     url_for("download", name=origname + ".png"),
                 ),
+                ("<h2>Tag search</h2>" + link_list([search_link(tag) for tag in tags])) if tags else "",
             ]
         )
     else:
@@ -170,16 +188,25 @@ def edit(name):
 
 @app.route("/download/<name>")
 def download(name):
-    return send_from_directory(DATA_DIR, name)
+    return send_from_directory(app.data_dir, name)
+
+
+def tenant_suffix():
+    return " [%s] " % os.path.basename(app.data_dir) if SUB_DATA_DIRS else ""
 
 
 @app.route("/")
 def root():
+    tenant = request.args.get("tenant", "")
+    if tenant and tenant in SUB_DATA_DIRS:
+        app.data_dir = os.path.join(DATA_DIR, tenant)
+        return redirect(url_for("root"))
     q = request.args.get("q", "")
     filter_to = set(search(q))
     return render_page(
         [
-            heading(("DMS - '%s'" % (q,)) if q else "DMS"),
+            heading("DMS%s%s" % (tenant_suffix(), ": searching for '%s'" % q if q else "")),
+            change_tenant() if SUB_DATA_DIRS else "",
             search_box(q),
             listofdir(
                 lambda fname: '<a href="%s"><img title="%i pages" class="small %s" src="%s"></a>'

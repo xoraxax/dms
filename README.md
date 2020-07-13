@@ -22,3 +22,6 @@ To run:
 
 Now copy PDF files into `~/source_folder` and watch them appear slightly later in your browser at
 `http://localhost:5000/`.
+
+If you want to use this DMS with multiple tenants, feel free to create subfolders in your `db`
+folder instead. This provides a tenant chooser dropdown.
