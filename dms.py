@@ -68,7 +68,7 @@ def search(query):
 
 
 def heading(s):
-    return "<h1><a href='/'>" + cgi.escape(s, quote=True) + "</a></h1>"
+    return "<h1><a href='/'>" + cgi.html.escape(s, quote=True) + "</a></h1>"
 
 
 def search_box(q):
