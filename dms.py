@@ -3,10 +3,12 @@
 
 import glob
 import html
+import itertools
 import logging
 import os
 import queue
 import re
+import subprocess
 import threading
 import time
 
@@ -26,23 +28,32 @@ RE_TAG = re.compile(r"#[^\s]*", re.U)
 
 
 class DirReaderThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.files = {}
+
+    def remove(self, fname):
+        del self.files[fname]
+
     def run(self):
-        files = {}
         while True:
             time.sleep(1)
             for fname in glob.glob(os.path.join(SOURCE_DIR, "*.pdf")):
                 t = time.time()
-                if files.setdefault(fname, t + DELAY) < t:
-                    del files[fname]
-                    FILE_QUEUE.put(fname)
+                if fname in self.files:
+                    if self.files[fname] and self.files[fname] < t:
+                        FILE_QUEUE.put((fname, lambda fname=fname: self.remove(fname)))
+                        self.files[fname] = None
+                else:
+                    self.files[fname] = t + DELAY
 
 
 class ImporterThread(threading.Thread):
     def run(self):
         while True:
-            fname = FILE_QUEUE.get()
-            # XXX use subprocess
-            os.system('"%s" "%s" "%s"' % (IMPORTER, fname, app.data_dir))
+            fname, finalizer = FILE_QUEUE.get()
+            subprocess.run([IMPORTER, fname, app.data_dir])
+            finalizer()
 
 
 @app.before_first_request
@@ -60,9 +71,7 @@ def search(q):
         )
     else:
         res = [re.compile(segment, re.I | re.U) for segment in q.split()]
-        for fname in glob.glob(os.path.join(app.data_dir, "*.txt")) + glob.glob(
-            os.path.join(app.data_dir, "*.desc")
-        ):
+        for fname in itertools.chain(*[glob.glob(os.path.join(app.data_dir, pattern)) for pattern in ("*.txt", "*.desc", "*.fname")]):
             data = open(fname).read()
             if all(regex.search(data) for regex in res):
                 yield os.path.basename(fname).rsplit(".", 1)[0]
@@ -152,6 +161,13 @@ def page_count(fname):
     return 0
 
 
+def original_filename(fname):
+    path = os.path.join(app.data_dir, fname) + ".fname"
+    if os.path.exists(path):
+        return open(path).read()
+    return ""
+
+
 @app.route("/edit/<name>", methods="GET POST".split())
 def edit(name):
     origname = name
@@ -166,7 +182,7 @@ def edit(name):
         tags = RE_TAG.findall(data)
         return render_page(
             [
-                heading("DMS%s: %s (%i pages)" % (tenant_suffix(), origname, page_count(origname))),
+                heading("DMS%s: %s (%i pages) %s" % (tenant_suffix(), origname, page_count(origname), original_filename(origname))),
                 '<form method=POST><textarea name="value" rows="10" cols="80" placeholder="Title and description here">%s</textarea><input type="submit" value="Save"></form>%s<img src="%s">'
                 % (
                     html.escape(data, quote=True),
