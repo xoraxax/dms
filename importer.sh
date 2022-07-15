@@ -1,5 +1,5 @@
 #!/bin/sh
-mtime=`stat -c '%Y' $1`
+mtime=`stat -c '%Y' "$1"`
 oldname=`basename "$1"`
 newname=`date -d "@$mtime" -Iseconds | tr :+ __`
 newname="$2/$newname.pdf"
