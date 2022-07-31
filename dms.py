@@ -150,6 +150,10 @@ def search_link(query):
 
 def render_page(l):
     s = """
+body {
+    font-family: Roboto, Verdana, Helvetica, sans-serif;
+}
+
 img {
     padding: 1em;
     border: 8px solid lightgray;
