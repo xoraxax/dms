@@ -126,7 +126,7 @@ def render_page(l):
     s = """
 img {
     padding: 1em;
-    background-color: lightgray;
+    border: 8px solid lightgray;
 }
 
 img.small {
@@ -134,7 +134,7 @@ img.small {
 }
 
 img.redflag {
-    background-color: orange;
+    border-color: orange;
 }
 
 a:link {
