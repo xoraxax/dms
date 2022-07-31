@@ -140,6 +140,10 @@ img.redflag {
 a:link {
     text-decoration: none;
 }
+
+#indexiframe {
+    display: none;
+}
 """
     return (
         "<html><head><title>DMS</title><style>%s</style></head><body>%s</body></html>"
@@ -195,6 +199,7 @@ def edit(name):
                     url_for("download", name=origname + ".png"),
                 ),
                 ("<h2>Tag search</h2>" + link_list([search_link(tag) for tag in tags])) if tags else "",
+                """<div style="padding-top: 2em;"><button onclick="getElementById('indexiframe').contentWindow.print();">Print index page<iframe id="indexiframe" srcdoc='<style>@media print { @page { margin: 0; }}</style><div style="padding: 7mm 20mm; font-family: sans-serif;"><b>%s</b><div>DMS index page</div></div>'></iframe></button></div>""" % name,
             ]
         )
     else:
