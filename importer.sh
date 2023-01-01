@@ -15,5 +15,5 @@ echo -n "$oldname"> "${newname%.pdf}.fname"
 tr -s '[[:punct:][:space:]]' '\n' < "${newname%.pdf}.txt" | sed 's/.*/\L&/' | awk 'length($0) <= 40 && length($0) >= 3' - | sort | uniq > "${newname%.pdf}.words"
 mkdir -p "$2/index"
 while read -r WORD; do
-  echo "${newname%.pdf}">>"$2/index/$WORD"
+  echo "${newbasename}">>"$2/index/$WORD"
 done < "${newname%.pdf}.words"
