@@ -12,7 +12,7 @@ To install:
   4. `mkdir ~/source_folder; ln -s ~/source_folder ./SOURCE_DIR`
   5. `virtualenv -p python3 env`
   6. `. env/bin/activate`
-  7. `pip install flask`
+  7. `pip install flask==1.1.4`
   8. `sudo apt install pdfsandwich poppler-utils imagemagick ghostscript netpbm`
 
 To run:
