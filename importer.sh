@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+echo Importing "$1" ...
 mtime=`stat -c '%Y' "$1"`
 oldname=`basename "$1"`
 newbasename=`date -d "@$mtime" -Iseconds | tr :+ __`
